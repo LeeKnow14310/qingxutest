@@ -95,6 +95,7 @@
   .r-title{font-size:26px; margin:14px 0 4px; font-weight:800;}
   .r-tag{display:inline-block; font-size:12px; letter-spacing:2px; color:var(--muted); margin-bottom:14px;}
   .r-score{display:inline-block; background:var(--accent-soft,#f6ecea); color:var(--accent-deep,#a98784); border-radius:999px; padding:6px 18px; font-size:14px; font-weight:700; margin-bottom:20px;}
+  .r-stat{font-size:13px; color:var(--muted); margin:-6px 0 18px; line-height:1.6; min-height:16px;}
   .r-text{text-align:left; font-size:15px; line-height:1.9; color:#5c5753; margin:0 0 26px;}
   .r-text p{margin:0 0 12px;}
   #btn-restart{width:100%;}
@@ -171,6 +172,7 @@
       <h2 class="r-title" id="r-title"></h2>
       <div class="r-tag" id="r-tag"></div>
       <div class="r-score" id="r-score"></div>
+      <div class="r-stat" id="r-stat"></div>
       <div class="r-text" id="r-text"></div>
       <div class="result-actions">
         <button class="btn primary" id="btn-share">📸 保存图片分享给朋友</button>
@@ -220,6 +222,8 @@ const questions = [
 const results = [
   {
     min: 0, max: 15, title: "行动派", tag: "轻盈果断 · 低内耗", emoji: "🌿", cls: "res-sage",
+    hook: "只有 12% 的人是「行动派」，你就是其中之一",
+    advice: "慢一点也没关系，允许自己偶尔停下来喘口气。",
     paras: [
       "亲爱的行动派，你的情绪内耗水平很低，这真的很难得。你习惯把事情想清楚就去做，不会让情绪在脑子里反复打转，也不会因为别人的一句话就怀疑自己。你像一阵清爽的风，说走就走、说做就做，很多人羡慕你这份果断和轻盈。",
       "不过我也想轻轻提醒你：有时候「不纠结」也可能是一种无声的保护——把情绪按下、不让自己停下来感受。如果你偶尔在深夜感到一丝空落落，那不是矫情，而是你的心在说，它也需要被听见。",
@@ -228,6 +232,8 @@ const results = [
   },
   {
     min: 16, max: 30, title: "敏感体", tag: "细腻敏锐 · 恰到好处的敏感", emoji: "🌸", cls: "res-rose",
+    hook: "38% 的人和你一样，都是高敏感体质",
+    advice: "把敏锐留给值得的人和事，别人的情绪不必你来背。",
     paras: [
       "你的内耗处于中等偏低的水平，我把它叫做「恰到好处的敏感」。你能敏锐地察觉气氛的变化、读懂别人的微表情，这种共情能力是你与生俱来的礼物。",
       "但也正因如此，你会比别人多接收一些情绪信号，偶尔觉得累、偶尔想太多，都是很正常的。你的课题不是「变钝」，而是学会给敏感装上开关：把敏锐留给值得的人和事，把别人的情绪还给别人。",
@@ -236,6 +242,8 @@ const results = [
   },
   {
     min: 31, max: 45, title: "躺平族", tag: "温柔逃避 · 需要休息", emoji: "🌙", cls: "res-blue",
+    hook: "27% 的人正在用「躺平」悄悄保护自己",
+    advice: "躺平是为了更好地出发，别把休息变成逃避。",
     paras: [
       "亲爱的，你的内耗已经有些明显了，而「躺平」其实是你用来保护自己的方式。想得多了、累了，干脆躲起来、不想动——这完全可以理解，你不是懒，你只是需要休息。",
       "躺平像一个柔软的盾牌，帮你挡掉了一部分焦虑；但如果一直举着它，它会慢慢变成一堵墙，把你和真正想要的生活隔开。那些用「无所谓」「算了」压下去的情绪，并不会真的消失。",
@@ -244,6 +252,8 @@ const results = [
   },
   {
     min: 46, max: 60, title: "内耗王", tag: "认真在乎 · 高内耗", emoji: "💭", cls: "res-mauve",
+    hook: "23% 的人和你一样，把心事想了一遍又一遍",
+    advice: "你不需要想通一切才出发，先迈出一小步就好。",
     paras: [
       "抱抱你。看到这个结果，我想先对你说：你会想这么多，不是因为你矫情、不是因为你脆弱，而是因为你太认真、太在乎了。你在脑子里反复排练、反复复盘，是因为你不想搞砸、不想让人失望——这份心，本身就很珍贵。",
       "只是，你把自己当成了世界上最严苛的监工，时刻用「万一」和「如果」鞭策自己。可思考得再多，也不等于已经解决了问题，反而耗干了你的力气。内耗的出口，从来不是「想通」，而是「停下来行动一点点」。",
@@ -324,6 +334,8 @@ function showResult() {
   $("r-tag").textContent = r.tag;
   $("r-score").textContent = "你的得分：" + total + " 分";
   $("r-text").innerHTML = r.paras.map(function (p) { return "<p>" + p + "</p>"; }).join("");
+  $("r-stat").textContent = "正在统计和你一样的人…";
+  updateStats(r);
 
   screenStart.classList.add("hidden");
   screenQuiz.classList.add("hidden");
@@ -345,6 +357,46 @@ $("btn-start").onclick = function () {
 };
 btnNext.onclick = next;
 btnPrev.onclick = prev;
+/* ===== 真实统计（abacus 免费计数 API，已验证支持跨域）===== */
+var STATS_BASE = "https://abacus.jasoncameron.dev";
+var STATS_NS = "leeknow14310-qingxu";
+var STATS_KEYS = { "行动派": "doer", "敏感体": "sensitive", "躺平族": "lying", "内耗王": "ruminator" };
+var liveStat = null;
+
+function statFetch(kind, key) {
+  return fetch(STATS_BASE + "/" + kind + "/" + STATS_NS + "/" + key, { cache: "no-store" })
+    .then(function (res) { return res.ok ? res.json() : { value: 0 }; })
+    .then(function (d) { return (d && d.value) ? d.value : 0; })
+    .catch(function () { return 0; });
+}
+
+function updateStats(r) {
+  var myKey = STATS_KEYS[r.title];
+  if (!myKey) return;
+  // 先给自己的结果类型 +1（并拿到最新计数），再读取其它三类的计数
+  statFetch("hit", myKey).then(function (mine) {
+    var others = [];
+    for (var t in STATS_KEYS) { if (STATS_KEYS[t] !== myKey) others.push(STATS_KEYS[t]); }
+    return Promise.all(others.map(function (k) { return statFetch("get", k); }))
+      .then(function (vals) {
+        var tot = mine;
+        vals.forEach(function (v) { tot += v; });
+        liveStat = { pct: tot > 0 ? Math.round(mine / tot * 100) : 0, mine: mine, total: tot };
+        renderStat(r);
+      });
+  });
+}
+
+function renderStat(r) {
+  var el = $("r-stat");
+  if (!el || !liveStat) return;
+  if (liveStat.total >= 20) {
+    el.textContent = "已有 " + liveStat.pct + "% 的人和你一样，是「" + r.title + "」";
+  } else {
+    el.textContent = "已经有 " + liveStat.mine + " 人和你一样，是「" + r.title + "」";
+  }
+}
+
 /* ===== 生成分享卡片图（Canvas 绘制，零外部依赖）===== */
 const COLOR_MAP = {
   "res-sage":  { soft: "#eef2ea", deep: "#7f9077" },
@@ -354,6 +406,11 @@ const COLOR_MAP = {
 };
 const FONT = "-apple-system,'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif";
 const EMOJI_FONT = "'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji','Segoe UI Symbol',sans-serif";
+
+/* 二维码（base64 内嵌，由构建脚本自动注入真实数据）*/
+const QR_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAV4AAAFeAQMAAAD35eVZAAAABlBMVEVNSkj///9a/LZVAAABuklEQVR42u2bQa7DIAxEreYAHImr50gcAImf4LEh7eZ3U9nSsEBR4lWfbM8YKuP/qwuDGcxgBjP4M7gLVhnj2o/rVTvwdNq3O+4lXywG/yZYNuZnuTfnVu8P852R5k8Xl+CNbNIyblde1iZ4kkKCaQheBRTckI0kmC8H762JV1YSzNQHkXkooCsv2QejEzQt2q2Aro1aNAHBfc0qiqf29pUEI1fRaQCL28Ni72o7SDBDDp6KDKVULcVMRHGHQYKh+2B9NEMtpWiBNp0hweBKBrM0mPmxp6Q6QxKMTbD0zdFPEaPOUKtooxbN4OiBzL39LKCVWjSRkplm3vug9kZvkCQYnKDAOWgBXfpFJ22NfTCFo/eDpWUFUUVJMDpBd3wuYro3yIN+MMdMxmtnsakajuxFv5JgdCUz9rsVsBQ+UCPB+G6iwNabDPWjQdmOmPjTBVcy4+NizH7+S4KxZzJzrbtqZgVt5E0tGl7JLFv/mIsuviQYvA+Kz9LKGrL1Z6ElwfgE3wwg3ITwdClRDj6sIFjyrlqePjhsLmp3DGEKqWSyaFE3hT7jrttlGRKM7wf5PyAGM5jBDP4u+A/cpzMzBGW6aQAAAABJRU5ErkJggg==";
+var qrImage = new Image();
+qrImage.src = QR_DATA_URL;
 
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -381,12 +438,11 @@ function wrapText(ctx, text, maxWidth) {
 }
 
 function generateShareImage(r, total) {
-  var W = 750, H = 1050, dpr = 2;
+  var W = 1080, H = 1440;   // 3:4 竖版，适合发小红书
   var canvas = document.createElement("canvas");
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
+  canvas.width = W;
+  canvas.height = H;
   var ctx = canvas.getContext("2d");
-  ctx.scale(dpr, dpr);
   var c = COLOR_MAP[r.cls] || { soft: "#f7efee", deep: "#a98784" };
 
   // 背景渐变
@@ -399,9 +455,9 @@ function generateShareImage(r, total) {
   // 白色圆角卡片
   ctx.save();
   ctx.shadowColor = "rgba(160,140,130,0.22)";
-  ctx.shadowBlur = 40;
-  ctx.shadowOffsetY = 16;
-  roundRect(ctx, 44, 44, W - 88, H - 88, 44);
+  ctx.shadowBlur = 50;
+  ctx.shadowOffsetY = 18;
+  roundRect(ctx, 56, 56, W - 112, H - 112, 48);
   ctx.fillStyle = "#ffffff";
   ctx.fill();
   ctx.restore();
@@ -412,55 +468,103 @@ function generateShareImage(r, total) {
 
   // 顶部小标题
   ctx.fillStyle = "#b6afa8";
-  ctx.font = "600 26px " + FONT;
-  ctx.fillText("情 绪 内 耗 测 试", cx, 150);
+  ctx.font = "600 32px " + FONT;
+  ctx.fillText("情 绪 内 耗 测 试", cx, 140);
 
   // emoji
-  ctx.font = "88px " + EMOJI_FONT;
+  ctx.font = "108px " + EMOJI_FONT;
   ctx.textBaseline = "middle";
-  ctx.fillText(r.emoji, cx, 258);
+  ctx.fillText(r.emoji, cx, 280);
   ctx.textBaseline = "alphabetic";
 
   // 结果名称
   ctx.fillStyle = c.deep;
-  ctx.font = "800 70px " + FONT;
-  ctx.fillText(r.title, cx, 398);
+  ctx.font = "800 96px " + FONT;
+  ctx.fillText(r.title, cx, 456);
 
   // 标签
   ctx.fillStyle = "#9b948e";
-  ctx.font = "400 24px " + FONT;
-  ctx.fillText(r.tag, cx, 446);
+  ctx.font = "400 30px " + FONT;
+  ctx.fillText(r.tag, cx, 510);
 
   // 得分徽章
   var badge = "你的得分：" + total + " 分";
-  ctx.font = "700 26px " + FONT;
-  var bw = ctx.measureText(badge).width + 64;
-  roundRect(ctx, cx - bw / 2, 484, bw, 58, 29);
+  ctx.font = "700 34px " + FONT;
+  var bw = ctx.measureText(badge).width + 84;
+  roundRect(ctx, cx - bw / 2, 548, bw, 76, 38);
   ctx.fillStyle = c.soft;
   ctx.fill();
   ctx.fillStyle = c.deep;
-  ctx.fillText(badge, cx, 484 + 38);
+  ctx.fillText(badge, cx, 598);
 
-  // 正文（取第一段解读）
+  // 正文（第一段解读，最多 4 行）
   ctx.textAlign = "left";
   ctx.fillStyle = "#5c5753";
-  ctx.font = "400 28px " + FONT;
-  var padX = 104;
+  ctx.font = "400 33px " + FONT;
+  var padX = 146;
   var lines = wrapText(ctx, r.paras[0], W - padX * 2);
-  if (lines.length > 7) { lines = lines.slice(0, 7); lines[6] = lines[6].slice(0, -1) + "…"; }
-  var lineH = 48, bodyY = 620;
+  if (lines.length > 4) { lines = lines.slice(0, 4); lines[3] = lines[3].slice(0, -1) + "…"; }
+  var lineH = 55, bodyY = 690;
   for (var i = 0; i < lines.length; i++) {
     ctx.fillText(lines[i], padX, bodyY + i * lineH);
   }
 
-  // 底部信息
+  // 人生建议（浅色圆角框）
+  roundRect(ctx, 140, 890, W - 280, 158, 26);
+  ctx.fillStyle = c.soft;
+  ctx.fill();
   ctx.textAlign = "center";
   ctx.fillStyle = c.deep;
-  ctx.font = "700 25px " + FONT;
-  ctx.fillText("leeknow14310.github.io/qingxutest", cx, H - 96);
+  ctx.font = "700 26px " + FONT;
+  ctx.fillText("人 生 小 建 议", cx, 936);
+  ctx.fillStyle = "#5c5753";
+  ctx.font = "400 31px " + FONT;
+  var aLines = wrapText(ctx, r.advice, W - 360);
+  if (aLines.length > 2) { aLines = aLines.slice(0, 2); aLines[1] = aLines[1].slice(0, -1) + "…"; }
+  for (var k = 0; k < aLines.length; k++) {
+    ctx.fillText(aLines[k], cx, 992 + k * 48);
+  }
+
+  // 分隔线
+  ctx.strokeStyle = "#eee6dd";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(146, 1090);
+  ctx.lineTo(W - 146, 1090);
+  ctx.stroke();
+
+  // 二维码
+  var qrX = 150, qrY = 1128, qrS = 200;
+  if (qrImage.complete && qrImage.naturalWidth) {
+    ctx.drawImage(qrImage, qrX, qrY, qrS, qrS);
+  } else {
+    ctx.fillStyle = "#f0ece7";
+    roundRect(ctx, qrX, qrY, qrS, qrS, 16);
+    ctx.fill();
+  }
+
+  // 右下：真实统计钩子（拿不到就退回固定文案）+ 网址
+  var hookText = r.hook;
+  if (liveStat && liveStat.total >= 20) {
+    hookText = "和你一样是「" + r.title + "」的人占 " + liveStat.pct + "%";
+  } else if (liveStat && liveStat.mine > 0) {
+    hookText = "已经有 " + liveStat.mine + " 人和你一样是「" + r.title + "」";
+  }
+
+  var tx = qrX + qrS + 46;
+  ctx.textAlign = "left";
+  ctx.fillStyle = c.deep;
+  ctx.font = "800 33px " + FONT;
+  var hLines = wrapText(ctx, hookText, W - tx - 120);
+  for (var j = 0; j < hLines.length && j < 2; j++) {
+    ctx.fillText(hLines[j], tx, 1172 + j * 48);
+  }
+  ctx.fillStyle = "#9b948e";
+  ctx.font = "400 27px " + FONT;
+  ctx.fillText("扫码 · 测测你的情绪内耗类型", tx, 1285);
   ctx.fillStyle = "#b6afa8";
   ctx.font = "400 23px " + FONT;
-  ctx.fillText("长按保存 · 测测你的情绪内耗类型", cx, H - 56);
+  ctx.fillText("leeknow14310.github.io/qingxutest", tx, 1326);
 
   return canvas.toDataURL("image/png");
 }
