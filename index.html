@@ -107,6 +107,22 @@
 
   .disclaimer{font-size:12px; color:#b6afa8; margin-top:22px; line-height:1.7; padding:0 10px;}
 
+  /* 结果页操作按钮 */
+  .result-actions{display:flex; flex-direction:column; gap:12px; margin-top:6px;}
+  .result-actions .btn{width:100%;}
+  .ghost-bordered{background:#fff; border:1.5px solid var(--line); color:var(--muted); box-shadow:none;}
+  .ghost-bordered:hover{border-color:var(--accent); color:var(--accent-deep); transform:translateY(-2px);}
+
+  /* 分享图片弹窗 */
+  .share-modal{position:fixed; inset:0; background:rgba(60,52,48,.55); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px); z-index:50; display:flex; align-items:center; justify-content:center; padding:18px; animation:fadeUp .3s ease both;}
+  .share-modal.hidden{display:none;}
+  .share-modal-inner{background:#fff; border-radius:24px; padding:16px; max-width:420px; width:100%; max-height:92vh; overflow-y:auto; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,.32);}
+  .share-modal-inner img{width:100%; border-radius:16px; display:block; box-shadow:0 8px 24px rgba(160,140,130,.25);}
+  .share-hint{font-size:13.5px; color:var(--muted); margin:14px 0 12px; line-height:1.7;}
+  .share-btns{display:flex; gap:10px;}
+  .share-btns .btn{flex:1; text-align:center;}
+  a.btn{display:block; text-decoration:none;}
+
   @media (max-width:380px){
     .q-text{font-size:17px;}
     .opt{font-size:14.5px; padding:13px 15px;}
@@ -156,9 +172,23 @@
       <div class="r-tag" id="r-tag"></div>
       <div class="r-score" id="r-score"></div>
       <div class="r-text" id="r-text"></div>
-      <button class="btn primary" id="btn-restart">再测一次</button>
+      <div class="result-actions">
+        <button class="btn primary" id="btn-share">📸 保存图片分享给朋友</button>
+        <button class="btn ghost-bordered" id="btn-restart">🔄 再测一次</button>
+      </div>
     </div>
     <p class="disclaimer">本测试仅供自我觉察参考，不构成任何心理诊断建议。<br>如果长期感到痛苦，请记得寻求专业心理帮助 ❤️</p>
+
+    <div class="share-modal hidden" id="share-modal">
+      <div class="share-modal-inner">
+        <img id="share-img" alt="情绪内耗测试结果">
+        <p class="share-hint">长按图片保存到相册 📱<br>或点下方按钮下载到电脑 👇</p>
+        <div class="share-btns">
+          <a class="btn primary" id="btn-download" download="情绪内耗测试结果.png">下载图片</a>
+          <button class="btn ghost" id="btn-close-share">关闭</button>
+        </div>
+      </div>
+    </div>
   </section>
 
 </div>
@@ -223,6 +253,8 @@ const results = [
 ];
 let current = 0;
 let answers = new Array(questions.length).fill(-1);
+let currentResult = null;
+let currentTotal = 0;
 
 const $ = id => document.getElementById(id);
 const screenStart = $("screen-start"), screenQuiz = $("screen-quiz"), screenResult = $("screen-result");
@@ -283,6 +315,8 @@ function prev() {
 function showResult() {
   const total = answers.reduce(function (a, b) { return a + b; }, 0);
   const r = results.find(function (x) { return total >= x.min && total <= x.max; }) || results[results.length - 1];
+  currentResult = r;
+  currentTotal = total;
 
   $("result-card").className = "result-card " + r.cls;
   $("r-emoji").textContent = r.emoji;
@@ -311,7 +345,147 @@ $("btn-start").onclick = function () {
 };
 btnNext.onclick = next;
 btnPrev.onclick = prev;
+/* ===== 生成分享卡片图（Canvas 绘制，零外部依赖）===== */
+const COLOR_MAP = {
+  "res-sage":  { soft: "#eef2ea", deep: "#7f9077" },
+  "res-rose":  { soft: "#f7efee", deep: "#a98784" },
+  "res-blue":  { soft: "#eef2f7", deep: "#7d90ab" },
+  "res-mauve": { soft: "#f3eef7", deep: "#9482a9" }
+};
+const FONT = "-apple-system,'PingFang SC','Microsoft YaHei','Segoe UI',sans-serif";
+const EMOJI_FONT = "'Segoe UI Emoji','Apple Color Emoji','Noto Color Emoji','Segoe UI Symbol',sans-serif";
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function wrapText(ctx, text, maxWidth) {
+  var lines = [], line = "";
+  for (var i = 0; i < text.length; i++) {
+    var ch = text[i];
+    if (ctx.measureText(line + ch).width > maxWidth && line !== "") {
+      lines.push(line);
+      line = ch;
+    } else {
+      line += ch;
+    }
+  }
+  if (line !== "") lines.push(line);
+  return lines;
+}
+
+function generateShareImage(r, total) {
+  var W = 750, H = 1050, dpr = 2;
+  var canvas = document.createElement("canvas");
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  var ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  var c = COLOR_MAP[r.cls] || { soft: "#f7efee", deep: "#a98784" };
+
+  // 背景渐变
+  var bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, "#f7f2ec");
+  bg.addColorStop(1, c.soft);
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 白色圆角卡片
+  ctx.save();
+  ctx.shadowColor = "rgba(160,140,130,0.22)";
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 16;
+  roundRect(ctx, 44, 44, W - 88, H - 88, 44);
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.restore();
+
+  var cx = W / 2;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+
+  // 顶部小标题
+  ctx.fillStyle = "#b6afa8";
+  ctx.font = "600 26px " + FONT;
+  ctx.fillText("情 绪 内 耗 测 试", cx, 150);
+
+  // emoji
+  ctx.font = "88px " + EMOJI_FONT;
+  ctx.textBaseline = "middle";
+  ctx.fillText(r.emoji, cx, 258);
+  ctx.textBaseline = "alphabetic";
+
+  // 结果名称
+  ctx.fillStyle = c.deep;
+  ctx.font = "800 70px " + FONT;
+  ctx.fillText(r.title, cx, 398);
+
+  // 标签
+  ctx.fillStyle = "#9b948e";
+  ctx.font = "400 24px " + FONT;
+  ctx.fillText(r.tag, cx, 446);
+
+  // 得分徽章
+  var badge = "你的得分：" + total + " 分";
+  ctx.font = "700 26px " + FONT;
+  var bw = ctx.measureText(badge).width + 64;
+  roundRect(ctx, cx - bw / 2, 484, bw, 58, 29);
+  ctx.fillStyle = c.soft;
+  ctx.fill();
+  ctx.fillStyle = c.deep;
+  ctx.fillText(badge, cx, 484 + 38);
+
+  // 正文（取第一段解读）
+  ctx.textAlign = "left";
+  ctx.fillStyle = "#5c5753";
+  ctx.font = "400 28px " + FONT;
+  var padX = 104;
+  var lines = wrapText(ctx, r.paras[0], W - padX * 2);
+  if (lines.length > 7) { lines = lines.slice(0, 7); lines[6] = lines[6].slice(0, -1) + "…"; }
+  var lineH = 48, bodyY = 620;
+  for (var i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], padX, bodyY + i * lineH);
+  }
+
+  // 底部信息
+  ctx.textAlign = "center";
+  ctx.fillStyle = c.deep;
+  ctx.font = "700 25px " + FONT;
+  ctx.fillText("leeknow14310.github.io/qingxutest", cx, H - 96);
+  ctx.fillStyle = "#b6afa8";
+  ctx.font = "400 23px " + FONT;
+  ctx.fillText("长按保存 · 测测你的情绪内耗类型", cx, H - 56);
+
+  return canvas.toDataURL("image/png");
+}
+
+function openShare() {
+  if (!currentResult) return;
+  var dataUrl;
+  try {
+    dataUrl = generateShareImage(currentResult, currentTotal);
+  } catch (e) {
+    alert("图片生成失败啦，请在电脑上再试一次～");
+    return;
+  }
+  $("share-img").src = dataUrl;
+  $("btn-download").href = dataUrl;
+  $("btn-download").download = "情绪内耗测试_" + currentResult.title + ".png";
+  $("share-modal").classList.remove("hidden");
+}
+
+function closeShare() { $("share-modal").classList.add("hidden"); }
+
 $("btn-restart").onclick = restart;
+$("btn-share").onclick = openShare;
+$("btn-close-share").onclick = closeShare;
+$("share-modal").onclick = function (e) { if (e.target === this) closeShare(); };
 </script>
 </body>
 </html>
